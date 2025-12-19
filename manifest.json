@@ -1,0 +1,27 @@
+{
+  "name": "飞牛私有云存储",
+  "short_name": "飞牛云",
+  "description": "高效访问你的飞牛私有云存储，简洁而不简单",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#165DFF",
+  "theme_color": "#165DFF",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

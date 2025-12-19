@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞牛私有云存储</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="manifest" href="/manifest.json">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#7B61FF',
+                        accent: '#FF7D00',
+                        neutral: '#1F2937',
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .nav-card-shadow { box-shadow: 0 10px 30px -5px rgba(22, 93, 255, 0.1); }
+            .nav-card-hover { transition: all 0.3s ease; }
+            .nav-card-hover:hover { transform: translateY(-8px); box-shadow: 0 20px 40px -5px rgba(22, 93, 255, 0.2); }
+            .bg-mask { position: relative; }
+            .bg-mask::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: 1; }
+            .content-wrapper { position: relative; z-index: 2; }
+            .modal-backdrop { backdrop-filter: blur(4px); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-cover bg-center bg-fixed bg-no-repeat" id="body-bg">
+    <div class="bg-mask min-h-screen flex flex-col">
+        <div class="content-wrapper flex-grow">
+            <!-- 头部（新增设置按钮） -->
+            <header class="py-8 px-6 md:px-12 text-center relative">
+                <!-- 设置按钮 -->
+                <button onclick="openSettingsModal()" class="absolute right-6 top-8 text-white hover:text-primary/80 transition-colors">
+                    <i class="fa-solid fa-cog text-xl"></i>
+                </button>
+                
+                <h1 class="text-[clamp(2rem,5vw,3.5rem)] font-bold text-white mb-2 drop-shadow-lg" id="pageTitle">
+                    飞牛私有云存储
+                </h1>
+                <p class="text-gray-100 text-lg max-w-2xl mx-auto drop-shadow-md" id="pageDesc">
+                    高效访问你的飞牛私有云存储，简洁而不简单
+                </p>
+            </header>
+
+            <!-- 核心导航区域（动态渲染） -->
+            <main class="flex-grow flex items-center justify-center px-6 md:px-12 py-8">
+                <div class="w-full max-w-6xl">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10" id="navItemsContainer">
+                        <!-- 导航项将通过JS动态渲染 -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 设置模态框（设置页面） -->
+    <div id="settingsModal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-backdrop">
+        <div class="bg-white rounded-2xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <!-- 模态框头部 -->
+            <div class="flex justify-between items-center mb-6 pb-4 border-b">
+                <h2 class="text-2xl font-bold text-neutral">设置</h2>
+                <button onclick="closeSettingsModal()" class="text-gray-500 hover:text-neutral transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- 网站基础信息设置 -->
+            <div class="mb-8">
+                <h3 class="text-lg font-semibold text-neutral mb-4">基础信息</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-600 mb-2">标题</label>
+                        <input type="text" id="settingsTitle" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="输入网站标题">
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 mb-2">描述</label>
+                        <input type="text" id="settingsDesc" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="输入网站描述">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导航项目管理 -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-neutral">项目管理</h3>
+                    <button onclick="addNewNavItem()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/80 transition-colors">
+                        <i class="fa-solid fa-plus mr-2"></i>添加项目
+                    </button>
+                </div>
+
+                <!-- 项目列表容器 -->
+                <div id="settingsNavItems" class="space-y-6">
+                    <!-- 项目项将动态渲染 -->
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="flex justify-end space-x-4 pt-4 border-t">
+                <button onclick="resetAllSettings()" class="px-4 py-2 bg-gray-200 text-neutral rounded-lg hover:bg-gray-300 transition-colors">
+                    恢复默认
+                </button>
+                <button onclick="saveAllSettings()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/80 transition-colors">
+                    保存所有设置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 全局数据 ==========
+        // 默认配置
+        const DEFAULT_CONFIG = {
+            siteInfo: {
+                title: "飞牛私有云存储",
+                description: "高效访问你的飞牛私有云存储，简洁而不简单"
+            },
+            navItems: [
+                {
+                    id: 1,
+                    name: "官方线路",
+                    description: "官方的远程访问线路",
+                    icon: "fa-network-wired",
+                    color: "primary",
+                    url: "https://fnos.net/xxxx"
+                },
+            ]
+        };
+
+        // 当前配置
+        let currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+
+        // ========== Bing壁纸功能 ==========
+        const bingApiUrl = 'https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN';
+        function setBingWallpaper() {
+            fetch(bingApiUrl)
+                .then(response => response.ok ? response.json() : Promise.reject('API请求失败'))
+                .then(data => {
+                    if (data && data.url) {
+                        document.getElementById('body-bg').style.backgroundImage = `url(${data.url})`;
+                    }
+                })
+                .catch(error => {
+                    console.error('获取Bing壁纸失败:', error);
+                    document.getElementById('body-bg').style.background = 'linear-gradient(to bottom right, rgba(31, 41, 55, 0.05), rgba(31, 41, 55, 0.1))';
+                    document.getElementById('body-bg').style.backgroundSize = 'cover';
+                });
+        }
+
+        // ========== 本地存储功能 ==========
+        // 从本地存储加载配置（静默读取，无弹窗）
+        function loadConfig() {
+            const savedConfig = localStorage.getItem("navSiteConfig");
+            if (savedConfig) {
+                try {
+                    currentConfig = JSON.parse(savedConfig);
+                } catch (e) {
+                    console.error('配置解析失败，使用默认值:', e);
+                    currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+                }
+            }
+            // 渲染页面
+            renderPage();
+        }
+
+        // 保存配置到本地存储
+        function saveConfig() {
+            localStorage.setItem("navSiteConfig", JSON.stringify(currentConfig));
+        }
+
+        // 恢复默认配置
+        function resetConfig() {
+            currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+            saveConfig();
+            renderPage();
+            renderSettingsForm();
+        }
+
+        // ========== 页面渲染 ==========
+        // 渲染主页面内容
+        function renderPage() {
+            // 更新网站标题和描述
+            document.getElementById('pageTitle').textContent = currentConfig.siteInfo.title;
+            document.getElementById('pageDesc').textContent = currentConfig.siteInfo.description;
+
+            // 渲染导航项目
+            const container = document.getElementById('navItemsContainer');
+            container.innerHTML = '';
+
+            if (currentConfig.navItems.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12 text-gray-500">
+                        <i class="fa-solid fa-folder-open text-4xl mb-4"></i>
+                        <p class="text-xl">暂无导航项目，请添加项目</p>
+                    </div>
+                `;
+                return;
+            }
+
+            currentConfig.navItems.forEach(item => {
+                const colorClass = item.color || 'primary';
+                const card = document.createElement('div');
+                card.className = 'bg-white/90 backdrop-blur-sm rounded-2xl p-8 nav-card-shadow nav-card-hover border border-gray-100';
+                card.innerHTML = `
+                    <div class="w-16 h-16 rounded-xl bg-${colorClass}/10 flex items-center justify-center mb-6">
+                        <i class="fa-solid ${item.icon || 'fa-link'} text-2xl text-${colorClass}"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-neutral mb-3">${item.name}</h3>
+                    <p class="text-gray-600 mb-6">${item.description || '暂无描述'}</p>
+                    <a href="${item.url || '#'}" class="inline-flex items-center text-${colorClass} font-medium hover:text-${colorClass}/80 transition-colors">
+                        访问项目 <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </a>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 渲染设置表单
+        function renderSettingsForm() {
+            // 填充网站信息
+            document.getElementById('settingsTitle').value = currentConfig.siteInfo.title;
+            document.getElementById('settingsDesc').value = currentConfig.siteInfo.description;
+
+            // 渲染项目设置列表
+            const container = document.getElementById('settingsNavItems');
+            container.innerHTML = '';
+
+            currentConfig.navItems.forEach((item, index) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'border border-gray-200 rounded-xl p-6';
+                itemEl.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <h4 class="font-medium text-neutral">项目 ${index + 1}</h4>
+                        <button onclick="deleteNavItem(${item.id})" class="text-red-500 hover:text-red-700 transition-colors">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-gray-600 mb-2">项目名称</label>
+                            <input type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg" 
+                                   value="${item.name}" onchange="updateNavItemField(${item.id}, 'name', this.value)">
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 mb-2">图标类名</label>
+                            <input type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg" 
+                                   placeholder="例如：fa-code" value="${item.icon}" onchange="updateNavItemField(${item.id}, 'icon', this.value)">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-gray-600 mb-2">配色</label>
+                            <select class="w-full px-3 py-2 border border-gray-200 rounded-lg" 
+                                    onchange="updateNavItemField(${item.id}, 'color', this.value)">
+                                <option value="primary" ${item.color === 'primary' ? 'selected' : ''}>蓝色（primary）</option>
+                                <option value="secondary" ${item.color === 'secondary' ? 'selected' : ''}>紫色（secondary）</option>
+                                <option value="accent" ${item.color === 'accent' ? 'selected' : ''}>橙色（accent）</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 mb-2">链接地址</label>
+                            <input type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg" 
+                                   value="${item.url}" onchange="updateNavItemField(${item.id}, 'url', this.value)">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 mb-2">项目描述</label>
+                        <textarea class="w-full px-3 py-2 border border-gray-200 rounded-lg min-h-[80px]" 
+                                  onchange="updateNavItemField(${item.id}, 'description', this.value)">${item.description}</textarea>
+                    </div>
+                `;
+                container.appendChild(itemEl);
+            });
+        }
+
+        // ========== 设置模态框交互 ==========
+        // 打开设置模态框
+        function openSettingsModal() {
+            renderSettingsForm();
+            document.getElementById('settingsModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // 禁止背景滚动
+        }
+
+        // 关闭设置模态框
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+            document.body.style.overflow = ''; // 恢复滚动
+        }
+
+        // ========== 项目管理功能 ==========
+        // 添加新导航项
+        function addNewNavItem() {
+            const newId = Date.now(); // 用时间戳作为唯一ID
+            currentConfig.navItems.push({
+                id: newId,
+                name: "新项目",
+                description: "请填写项目描述",
+                icon: "fa-link",
+                color: "primary",
+                url: "#"
+            });
+            renderSettingsForm();
+        }
+
+        // 删除导航项
+        function deleteNavItem(id) {
+            if (confirm('确定要删除这个项目吗？')) {
+                currentConfig.navItems = currentConfig.navItems.filter(item => item.id !== id);
+                renderSettingsForm();
+            }
+        }
+
+        // 更新导航项字段
+        function updateNavItemField(id, field, value) {
+            const item = currentConfig.navItems.find(item => item.id === id);
+            if (item) {
+                item[field] = value;
+            }
+        }
+
+        // 保存所有设置
+        function saveAllSettings() {
+            // 更新网站信息
+            currentConfig.siteInfo.title = document.getElementById('settingsTitle').value.trim() || DEFAULT_CONFIG.siteInfo.title;
+            currentConfig.siteInfo.description = document.getElementById('settingsDesc').value.trim() || DEFAULT_CONFIG.siteInfo.description;
+            
+            // 保存配置
+            saveConfig();
+            // 更新页面
+            renderPage();
+            // 关闭模态框
+            closeSettingsModal();
+            
+            // 提示保存成功（非阻塞式）
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-6 right-6 bg-primary text-white px-6 py-3 rounded-lg shadow-lg z-50';
+            toast.textContent = '设置已保存！';
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 2000);
+        }
+
+        // 恢复默认设置
+        function resetAllSettings() {
+            if (confirm('确定要恢复所有默认设置吗？这将清除你所有的自定义配置！')) {
+                resetConfig();
+                closeSettingsModal();
+            }
+        }
+
+        // ========== 页面初始化 ==========
+        window.onload = function() {
+            setBingWallpaper();
+            loadConfig(); // 静默加载配置，无弹窗
+            
+            // 点击模态框背景关闭
+            document.getElementById('settingsModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeSettingsModal();
+                }
+            });
+        };
+
+        // 按ESC关闭模态框
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSettingsModal();
+            }
+        });
+
+        // 注册Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(function(registration) {
+                        console.log('Service Worker 注册成功，作用域为:', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.log('Service Worker 注册失败:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
